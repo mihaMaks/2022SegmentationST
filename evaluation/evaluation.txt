@@ -1,0 +1,72 @@
+
+
+category: 000
+distance	2.11
+f1_eval	0.06
+f_measure	2.96
+precision	2.02
+recall	5.55
+
+
+category: 001
+distance	1.42
+f1_eval	0.53
+f_measure	53.97
+precision	46.60
+recall	64.11
+
+
+category: 010
+distance	2.75
+f1_eval	0.29
+f_measure	28.97
+precision	25.29
+recall	33.90
+
+
+category: 011
+distance	2.96
+f1_eval	0.31
+f_measure	37.86
+precision	36.85
+recall	38.93
+
+
+category: 100
+distance	2.73
+f1_eval	0.15
+f_measure	14.87
+precision	12.16
+recall	19.14
+
+
+category: 101
+distance	1.51
+f1_eval	0.50
+f_measure	50.83
+precision	51.57
+recall	50.12
+
+
+category: 110
+distance	3.31
+f1_eval	0.23
+f_measure	25.53
+precision	24.92
+recall	26.17
+
+
+category: 111
+distance	3.22
+f1_eval	0.28
+f_measure	31.22
+precision	34.81
+recall	28.30
+
+
+category: all
+distance	2.69
+f1_eval	0.23
+f_measure	24.28
+precision	20.99
+recall	28.79

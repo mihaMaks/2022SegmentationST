@@ -61,16 +61,17 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 
-def compute_stats(dists, overlaps, gold_lens, pred_lens):
+def compute_stats(dists, overlaps, gold_lens, pred_lens, F1_eval):
     mean_dist = sum(dists) / len(dists)
     total_overlaps = sum(overlaps)
     precision = 100 * total_overlaps / sum(pred_lens)
     recall = 100 * total_overlaps / sum(gold_lens)
+    mean_f1 = sum(F1_eval) / len(F1_eval)
     if precision+recall == 0:
         f_measure = .0
     else:
         f_measure = 2 * precision * recall / (precision + recall)
-    return {"distance": mean_dist, "precision": precision, "recall": recall, "f_measure": f_measure}
+    return {"distance": mean_dist, "precision": precision, "recall": recall, "f_measure": f_measure, "f1_eval": mean_f1}
 
 
 def stratify(sequence, labels):
@@ -79,6 +80,23 @@ def stratify(sequence, labels):
     for label, value in zip(labels, sequence):
         by_label[label].append(value)
     return by_label
+def F1_score(real_segm, pred_segm):
+    real = set()
+    pred = set()
+    c = 0
+    for s in real_segm.split('|'):
+        real.add((c, s))
+        c += len(s)
+    c = 0
+    for s in pred_segm.split('|'):
+        pred.add((c, s))
+        c += len(s)
+    recall = len(pred & real) / len(real)
+    precision = len(pred & real) / len(pred)
+    if precision + recall == 0:
+        return 0
+    F1 = 2 * (precision * recall) / (precision + recall)
+    return F1
 
 
 def main(args):
@@ -86,6 +104,10 @@ def main(args):
     guess_data = read_tsv(args.guess, False)  # only second column is needed
     assert len(gold_data["segments"]) == len(guess_data["segments"]), \
         "gold and guess tsvs do not have the same number of entries"
+    #new metric
+    F1_eval = [F1_score(gold, guess)
+                       for gold, guess
+                       in zip(gold_data["segments"], guess_data["segments"])]
 
     # levenshtein distance can be computed separately for each pair
     dists = [distance(gold, guess)
@@ -106,17 +128,19 @@ def main(args):
         overlaps_by_cat = stratify(n_overlaps, categories)
         gold_lens_by_cat = stratify(gold_lens, categories)
         pred_lens_by_cat = stratify(pred_lens, categories)
+        pred_F1_by_cat = stratify(F1_eval, categories)
 
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
                 dists_by_cat[cat],
                 overlaps_by_cat[cat],
                 gold_lens_by_cat[cat],
-                pred_lens_by_cat[cat]
+                pred_lens_by_cat[cat],
+                pred_F1_by_cat[cat]
             )
             print_numbers(cat_stats, cat=cat)
 
-    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens)
+    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, F1_eval)
     print_numbers(overall_stats)
 
 
