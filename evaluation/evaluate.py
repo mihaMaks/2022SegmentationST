@@ -61,17 +61,26 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 
-def compute_stats(dists, overlaps, gold_lens, pred_lens, F1_eval):
+def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_scores):
     mean_dist = sum(dists) / len(dists)
     total_overlaps = sum(overlaps)
-    precision = 100 * total_overlaps / sum(pred_lens)
-    recall = 100 * total_overlaps / sum(gold_lens)
-    mean_f1 = sum(F1_eval) / len(F1_eval)
+    pred_lens_sum = sum(pred_lens)
+    gold_lens_sum = sum(gold_lens)
+    precision = 100 * total_overlaps / pred_lens_sum
+    recall = 100 * total_overlaps / gold_lens_sum
     if precision+recall == 0:
         f_measure = .0
     else:
         f_measure = 2 * precision * recall / (precision + recall)
-    return {"distance": mean_dist, "precision": precision, "recall": recall, "f_measure": f_measure, "f1_eval": mean_f1}
+
+    f1_sum = sum(f1_scores)
+    f1_precision = f1_sum / pred_lens_sum
+    f1_recall = f1_sum / gold_lens_sum
+    if f1_precision+f1_recall == 0:
+        f1_seg_score = .0
+    else:
+        f1_seg_score = 2 * precision * recall / (precision + recall)
+    return {"distance": mean_dist, "precision": precision, "recall": recall, "f_measure": f_measure, "f1_seg_score": f1_seg_score}
 
 
 def stratify(sequence, labels):
@@ -80,7 +89,7 @@ def stratify(sequence, labels):
     for label, value in zip(labels, sequence):
         by_label[label].append(value)
     return by_label
-def F1_score(real_segm, pred_segm):
+def f1_segmentation(real_segm, pred_segm):
     real = set()
     pred = set()
     c = 0
@@ -95,8 +104,8 @@ def F1_score(real_segm, pred_segm):
     precision = len(pred & real) / len(pred)
     if precision + recall == 0:
         return 0
-    F1 = 2 * (precision * recall) / (precision + recall)
-    return F1
+    f1_score = 100 * (precision * recall) / (precision + recall)
+    return f1_score
 
 
 def main(args):
@@ -105,7 +114,7 @@ def main(args):
     assert len(gold_data["segments"]) == len(guess_data["segments"]), \
         "gold and guess tsvs do not have the same number of entries"
     #new metric
-    F1_eval = [F1_score(gold, guess)
+    f1_score = [f1_segmentation(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
 
@@ -128,7 +137,7 @@ def main(args):
         overlaps_by_cat = stratify(n_overlaps, categories)
         gold_lens_by_cat = stratify(gold_lens, categories)
         pred_lens_by_cat = stratify(pred_lens, categories)
-        pred_F1_by_cat = stratify(F1_eval, categories)
+        pred_f1_by_cat = stratify(f1_score, categories)
 
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
@@ -136,11 +145,11 @@ def main(args):
                 overlaps_by_cat[cat],
                 gold_lens_by_cat[cat],
                 pred_lens_by_cat[cat],
-                pred_F1_by_cat[cat]
+                pred_f1_by_cat[cat]
             )
             print_numbers(cat_stats, cat=cat)
 
-    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, F1_eval)
+    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1_score)
     print_numbers(overall_stats)
 
 
