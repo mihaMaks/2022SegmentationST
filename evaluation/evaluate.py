@@ -28,7 +28,8 @@ def distance(str1, str2):
 def print_numbers(stats_dict, cat="all"):
     print("\n")
     print("category:", cat)
-    for stat_name, stat in sorted(stats_dict.items()):
+                        #sorted(stats_dict.items())
+    for stat_name, stat in stats_dict.items():
         print("\t".join([stat_name, "{:.2f}".format(stat)]))
 
 
@@ -61,8 +62,9 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 
-def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_scores):
+def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_score_prec_rec):
     mean_dist = sum(dists) / len(dists)
+    #n_corect
     total_overlaps = sum(overlaps)
     pred_lens_sum = sum(pred_lens)
     gold_lens_sum = sum(gold_lens)
@@ -72,15 +74,24 @@ def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_scores):
         f_measure = .0
     else:
         f_measure = 2 * precision * recall / (precision + recall)
+    #f1_segmantation
+    f1_score = sum([score[0] for score in f1_sc_pp_gp_tp]) / len(f1_sc_pp_gp_tp)
+    f1_tp_sum = sum([score[3] for score in f1_sc_pp_gp_tp])
+    f1_precision = 100 * f1_tp_sum / sum([score[1] for score in f1_sc_pp_gp_tp])
+    f1_recall = 100 * f1_tp_sum / sum([score[2] for score in f1_sc_pp_gp_tp])
 
-    f1_sum = sum(f1_scores)
-    f1_precision = f1_sum / pred_lens_sum
-    f1_recall = f1_sum / gold_lens_sum
-    if f1_precision+f1_recall == 0:
-        f1_seg_score = .0
-    else:
-        f1_seg_score = 2 * precision * recall / (precision + recall)
-    return {"distance": mean_dist, "precision": precision, "recall": recall, "f_measure": f_measure, "f1_seg_score": f1_seg_score}
+    #f2_segmentation
+    f2_len = len(f2_score_prec_rec)
+    f2_scores = sum([score[0] for score in f2_score_prec_rec])
+    f2_precision = sum([score[1] for score in f2_score_prec_rec])
+    f2_recall = sum([score[2] for score in f2_score_prec_rec])
+    f2_mean = f2_scores / f2_len
+    f2_mean_precision = f2_precision / f2_len
+    f2_mean_recall = f2_recall / f2_len
+
+    return {"distance": mean_dist,  "f_measure": f_measure, "f1_mean": f1_score,"f2_mean": f2_mean,
+            "precision": precision, "f1_precision": f1_precision, "f2_mean_precision": f2_mean_precision,
+            "recall": recall, "f1_recall": f1_recall, "f2_mean_recall": f2_mean_recall}
 
 
 def stratify(sequence, labels):
@@ -100,12 +111,45 @@ def f1_segmentation(real_segm, pred_segm):
     for s in pred_segm.split('|'):
         pred.add((c, s))
         c += len(s)
-    recall = len(pred & real) / len(real)
-    precision = len(pred & real) / len(pred)
+    recall = 100 * len(pred & real) / len(real)
+    precision = 100 * len(pred & real) / len(pred)
+    pred_positives = len(pred_segm)
+    grnd_positives = len(real)
+    true_positives = len(pred&real)
+
     if precision + recall == 0:
-        return 0
-    f1_score = 100 * (precision * recall) / (precision + recall)
-    return f1_score
+        return (0, pred_positives, grnd_positives, true_positives)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    return (f1_score, pred_positives, grnd_positives, true_positives)
+def f2_segmentation(true, predicted):
+    real = set()
+    pred = set()
+    c = 0
+    for s in true.split("|")[:-1]:
+        c += len(s)
+        real.add(c)
+    c = 0
+    for s in predicted.split("|")[:-1]:
+        c += len(s)
+        pred.add(c)
+
+    if real:
+        recall = 100 * len(pred & real) / len(real)
+    else:
+        # monomorph - 0 if something predicted, 1 otherwise
+        recall = 0 if pred else 100
+
+    if pred:
+        precision = 100 * len(pred & real) / len(pred)
+    else:
+        # predicted monomorph - 0 if it should not be, 1 if it is
+        precision = 0 if real else 100
+
+    if precision + recall == 0:
+        return (0, precision, recall)
+    f2_score = 2 * (precision * recall) / (precision + recall)
+    return (f2_score, precision, recall)
+
 
 
 def main(args):
@@ -113,8 +157,11 @@ def main(args):
     guess_data = read_tsv(args.guess, False)  # only second column is needed
     assert len(gold_data["segments"]) == len(guess_data["segments"]), \
         "gold and guess tsvs do not have the same number of entries"
-    #new metric
-    f1_score = [f1_segmentation(gold, guess)
+    #new metrics
+    f1_sc_pp_gp_tp = [f1_segmentation(gold, guess)
+                       for gold, guess
+                       in zip(gold_data["segments"], guess_data["segments"])]
+    f2_score_prec_rec = [f2_segmentation(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
 
@@ -137,7 +184,8 @@ def main(args):
         overlaps_by_cat = stratify(n_overlaps, categories)
         gold_lens_by_cat = stratify(gold_lens, categories)
         pred_lens_by_cat = stratify(pred_lens, categories)
-        pred_f1_by_cat = stratify(f1_score, categories)
+        pred_f1_by_cat = stratify(f1_sc_pp_gp_tp, categories)
+        pred_f2_by_cat = stratify(f2_score_prec_rec, categories)
 
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
@@ -145,11 +193,12 @@ def main(args):
                 overlaps_by_cat[cat],
                 gold_lens_by_cat[cat],
                 pred_lens_by_cat[cat],
-                pred_f1_by_cat[cat]
+                pred_f1_by_cat[cat],
+                pred_f2_by_cat[cat]
             )
             print_numbers(cat_stats, cat=cat)
 
-    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1_score)
+    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_score_prec_rec)
     print_numbers(overall_stats)
 
 
