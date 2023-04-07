@@ -118,7 +118,7 @@ def f1_segmentation(real_segm, pred_segm):
         return (0, pred_positives, grnd_positives, true_positives)
     f1_score = 2 * (precision * recall) / (precision + recall)
     return (f1_score, pred_positives, grnd_positives, true_positives)
-def f2_segmentation(true, predicted):
+def f2_breaks(true, predicted):
     real = set()
     pred = set()
     c = 0
@@ -161,7 +161,7 @@ def main(args):
     f1_sc_pp_gp_tp = [f1_segmentation(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
-    f2_sc_pp_gp_tp = [f2_segmentation(gold, guess)
+    f2_sc_pp_gp_tp = [f2_breaks(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
 
