@@ -62,7 +62,7 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 
-def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_score_prec_rec):
+def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_sc_pp_gp_tp):
     mean_dist = sum(dists) / len(dists)
     #n_corect
     total_overlaps = sum(overlaps)
@@ -81,17 +81,14 @@ def compute_stats(dists, overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_scor
     f1_recall = 100 * f1_tp_sum / sum([score[2] for score in f1_sc_pp_gp_tp])
 
     #f2_segmentation
-    f2_len = len(f2_score_prec_rec)
-    f2_scores = sum([score[0] for score in f2_score_prec_rec])
-    f2_precision = sum([score[1] for score in f2_score_prec_rec])
-    f2_recall = sum([score[2] for score in f2_score_prec_rec])
-    f2_mean = f2_scores / f2_len
-    f2_mean_precision = f2_precision / f2_len
-    f2_mean_recall = f2_recall / f2_len
+    f2_score = sum([score[0] for score in f2_sc_pp_gp_tp]) / len(f2_sc_pp_gp_tp)
+    f2_tp_sum = sum([score[3] for score in f2_sc_pp_gp_tp])
+    f2_precision = 100 * f2_tp_sum / sum([score[1] for score in f2_sc_pp_gp_tp])
+    f2_recall = 100 * f2_tp_sum / sum([score[2] for score in f2_sc_pp_gp_tp])
 
-    return {"distance": mean_dist,  "f_measure": f_measure, "f1_mean": f1_score,"f2_mean": f2_mean,
-            "precision": precision, "f1_precision": f1_precision, "f2_mean_precision": f2_mean_precision,
-            "recall": recall, "f1_recall": f1_recall, "f2_mean_recall": f2_mean_recall}
+    return {"distance": mean_dist,  "f_measure": f_measure, "f1_mean": f1_score,"f2_mean": f2_score,
+            "precision": precision, "f1_precision": f1_precision, "f2_mean_precision": f2_precision,
+            "recall": recall, "f1_recall": f1_recall, "f2_mean_recall": f2_recall}
 
 
 def stratify(sequence, labels):
@@ -113,7 +110,7 @@ def f1_segmentation(real_segm, pred_segm):
         c += len(s)
     recall = 100 * len(pred & real) / len(real)
     precision = 100 * len(pred & real) / len(pred)
-    pred_positives = len(pred_segm)
+    pred_positives = len(pred)
     grnd_positives = len(real)
     true_positives = len(pred&real)
 
@@ -138,17 +135,20 @@ def f2_segmentation(true, predicted):
     else:
         # monomorph - 0 if something predicted, 1 otherwise
         recall = 0 if pred else 100
-
+    pred_positives = len(pred)
+    grnd_positives = len(real)
+    true_positives = len(pred & real)
     if pred:
         precision = 100 * len(pred & real) / len(pred)
     else:
         # predicted monomorph - 0 if it should not be, 1 if it is
         precision = 0 if real else 100
 
+
     if precision + recall == 0:
-        return (0, precision, recall)
+        return (0, pred_positives, grnd_positives, true_positives)
     f2_score = 2 * (precision * recall) / (precision + recall)
-    return (f2_score, precision, recall)
+    return (f2_score, pred_positives, grnd_positives, true_positives)
 
 
 
@@ -161,7 +161,7 @@ def main(args):
     f1_sc_pp_gp_tp = [f1_segmentation(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
-    f2_score_prec_rec = [f2_segmentation(gold, guess)
+    f2_sc_pp_gp_tp = [f2_segmentation(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
 
@@ -185,7 +185,7 @@ def main(args):
         gold_lens_by_cat = stratify(gold_lens, categories)
         pred_lens_by_cat = stratify(pred_lens, categories)
         pred_f1_by_cat = stratify(f1_sc_pp_gp_tp, categories)
-        pred_f2_by_cat = stratify(f2_score_prec_rec, categories)
+        pred_f2_by_cat = stratify(f2_sc_pp_gp_tp, categories)
 
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
@@ -198,7 +198,7 @@ def main(args):
             )
             print_numbers(cat_stats, cat=cat)
 
-    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_score_prec_rec)
+    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1_sc_pp_gp_tp, f2_sc_pp_gp_tp)
     print_numbers(overall_stats)
 
 
