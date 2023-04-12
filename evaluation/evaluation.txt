@@ -7,7 +7,7 @@ f1_ver2	5.548
 f1_ver3	9.425
 ver1_precision	2.019
 ver2_precision	2.019
-ver3_precision	5.391
+ver3_precision	5.116
 ver1_recall	5.548
 ver2_recall	5.548
 ver3_recall	9.425
@@ -23,13 +23,13 @@ f1_ver2	52.922
 f1_ver3	67.444
 ver1_precision	46.603
 ver2_precision	41.344
-ver3_precision	50.213
+ver3_precision	48.361
 ver1_recall	64.106
 ver2_recall	56.873
-ver3_recall	87.885
+ver3_recall	85.700
 f1v1_sum	2579.000
 f1v2_sum	2288.000
-f1v3_sum	1770.000
+f1v3_sum	1726.000
 
 
 category: 010
@@ -39,13 +39,13 @@ f1_ver2	29.237
 f1_ver3	44.372
 ver1_precision	25.294
 ver2_precision	22.502
-ver3_precision	33.428
+ver3_precision	32.545
 ver1_recall	33.902
 ver2_recall	30.160
-ver3_recall	52.181
+ver3_recall	51.142
 f1v1_sum	18113.000
 f1v2_sum	16114.000
-f1v3_sum	16912.000
+f1v3_sum	16575.000
 
 
 category: 011
@@ -55,13 +55,13 @@ f1_ver2	31.083
 f1_ver3	50.490
 ver1_precision	36.846
 ver2_precision	28.454
-ver3_precision	46.222
+ver3_precision	45.817
 ver1_recall	38.928
 ver2_recall	30.062
-ver3_recall	50.030
+ver3_recall	49.729
 f1v1_sum	944.000
 f1v2_sum	729.000
-f1v3_sum	832.000
+f1v3_sum	827.000
 
 
 category: 100
@@ -71,13 +71,13 @@ f1_ver2	14.615
 f1_ver3	21.962
 ver1_precision	12.162
 ver2_precision	11.442
-ver3_precision	17.318
+ver3_precision	15.309
 ver1_recall	19.138
 ver2_recall	18.004
-ver3_recall	37.184
+ver3_recall	33.444
 f1v1_sum	4626.000
 f1v2_sum	4352.000
-f1v3_sum	4494.000
+f1v3_sum	4042.000
 
 
 category: 101
@@ -87,13 +87,13 @@ f1_ver2	49.590
 f1_ver3	65.826
 ver1_precision	51.569
 ver2_precision	50.483
-ver3_precision	67.683
+ver3_precision	67.253
 ver1_recall	50.117
 ver2_recall	49.062
-ver3_recall	64.826
+ver3_recall	64.580
 f1v1_sum	2137.000
 f1v2_sum	2092.000
-f1v3_sum	1843.000
+f1v3_sum	1836.000
 
 
 category: 110
@@ -103,13 +103,13 @@ f1_ver2	23.440
 f1_ver3	41.224
 ver1_precision	24.916
 ver2_precision	21.965
-ver3_precision	38.637
+ver3_precision	38.157
 ver1_recall	26.165
 ver2_recall	23.066
-ver3_recall	41.407
+ver3_recall	41.035
 f1v1_sum	9667.000
 f1v2_sum	8522.000
-f1v3_sum	10695.000
+f1v3_sum	10599.000
 
 
 category: 111
@@ -119,13 +119,13 @@ f1_ver2	27.830
 f1_ver3	48.001
 ver1_precision	34.809
 ver2_precision	29.688
-ver3_precision	54.388
+ver3_precision	53.629
 ver1_recall	28.299
 ver2_recall	24.135
-ver3_recall	40.968
+ver3_recall	40.596
 f1v1_sum	401.000
 f1v2_sum	342.000
-f1v3_sum	440.000
+f1v3_sum	436.000
 
 
 category: all

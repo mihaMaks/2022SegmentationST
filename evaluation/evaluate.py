@@ -139,13 +139,16 @@ def f1_ver3(true, predicted):
         # monomorph - 0 if something predicted, 1 otherwise
         recall = 0 if pred else 100
         grnd_positives = 1
+        pred_positives = len(pred) if pred else 1
+
 
     if pred:
         precision = 100 * len(pred & real) / len(pred)
     else:
         # predicted monomorph - 0 if it should not be, 1 if it is
         precision = 0 if real else 100
-        true_positives = 1
+        true_positives = 0 if real else 1
+        pred_positives = 1
 
 
     if precision + recall == 0:
