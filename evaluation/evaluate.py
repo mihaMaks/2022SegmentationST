@@ -74,22 +74,29 @@ def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_sc_pp_gp_tp, f1v3_
         f_measure = .0
     else:
         f_measure = 2 * precision * recall / (precision + recall)
-    #f1_segments
-    f1v2_score = sum([score[0] for score in f1v2_sc_pp_gp_tp]) / len(f1v2_sc_pp_gp_tp)
-    f1v2_tp_sum = sum([score[3] for score in f1v2_sc_pp_gp_tp])
-    f1v2_precision = 100 * f1v2_tp_sum /pred_lens_sum
-    f1v2_recall = 100 * f1v2_tp_sum /gold_lens_sum
 
-    #f1_blocks
-    f1v3_score = sum([score[0] for score in f1v3_sc_pp_gp_tp]) / len(f1v3_sc_pp_gp_tp)
+    #f1_segments
+    f1v2_tp_sum = sum([score[3] for score in f1v2_sc_pp_gp_tp])
+    f1v2_precision = 100 * f1v2_tp_sum / sum([score[1] for score in f1v2_sc_pp_gp_tp])
+    f1v2_recall = 100 * f1v2_tp_sum / sum([score[2] for score in f1v2_sc_pp_gp_tp])
+    if f1v2_precision+f1v2_recall == 0:
+        f1v2_score = .0
+    else:
+        f1v2_score = 2 * f1v2_precision * f1v2_recall / (f1v2_precision + f1v2_recall)
+
+    #f1_breaks
     f1v3_tp_sum = sum([score[3] for score in f1v3_sc_pp_gp_tp])
     f1v3_precision = 100 * f1v3_tp_sum / sum([score[1] for score in f1v3_sc_pp_gp_tp])
     f1v3_recall = 100 * f1v3_tp_sum / sum([score[2] for score in f1v3_sc_pp_gp_tp])
+    if f1v3_precision+f1v3_recall == 0:
+        f1v3_score = .0
+    else:
+        f1v3_score = 2 * f1v3_precision * f1v3_recall / (f1v3_precision + f1v3_recall)
 
     return {"distance": mean_dist,  "f_ver1": f_measure, "f1_ver2": f1v2_score,"f1_ver3": f1v3_score,
             "ver1_precision": precision, "ver2_precision": f1v2_precision, "ver3_precision": f1v3_precision,
             "ver1_recall": recall, "ver2_recall": f1v2_recall, "ver3_recall": f1v3_recall,
-            "f1v1_sum": total_overlaps, "f1v2_sum": f1v2_tp_sum, "f1v3_sum": f1v3_tp_sum}
+            "f1v1_tp_sum": total_overlaps, "f1v2_tp_sum": f1v2_tp_sum, "f1v3_tp_sum": f1v3_tp_sum}
 
 
 def stratify(sequence, labels):
@@ -99,6 +106,7 @@ def stratify(sequence, labels):
         by_label[label].append(value)
     return by_label
 def f1_ver2(real_segm, pred_segm):
+    real_segm = real_segm.lower()
     real = set()
     pred = set()
     c = 0
@@ -130,9 +138,20 @@ def f1_ver3(true, predicted):
     for s in predicted.split("|")[:-1]:
         c += len(s)
         pred.add(c)
+
     grnd_positives = len(real)
     pred_positives = len(pred)
     true_positives = len(pred & real)
+
+    #if prediction is correct count as if it is counting segments
+    if pred_positives == grnd_positives and true_positives == grnd_positives:
+        true_positives += 1
+        grnd_positives += 1
+        pred_positives += 1
+    else: #or just count as if last segment is guessed incorectly
+        grnd_positives += 1
+        pred_positives += 1
+
     if real:
         recall = 100 * len(pred & real) / len(real)
     else:
@@ -140,7 +159,6 @@ def f1_ver3(true, predicted):
         recall = 0 if pred else 100
         grnd_positives = 1
         pred_positives = len(pred) if pred else 1
-
 
     if pred:
         precision = 100 * len(pred & real) / len(pred)
@@ -157,7 +175,6 @@ def f1_ver3(true, predicted):
     return (f2_score, pred_positives, grnd_positives, true_positives)
 
 
-
 def main(args):
     gold_data = read_tsv(args.gold, args.category)
     guess_data = read_tsv(args.guess, False)  # only second column is needed
@@ -167,6 +184,7 @@ def main(args):
     f1v2_sc_pp_gp_tp = [f1_ver2(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
+
     f1v3_sc_pp_gp_tp = [f1_ver3(gold, guess)
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
