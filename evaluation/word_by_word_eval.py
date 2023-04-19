@@ -42,6 +42,7 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 def f1_segmentation(real_segm, pred_segm):
+    real_segm = real_segm.lower()
     real = set()
     pred = set()
     c = 0
@@ -52,12 +53,16 @@ def f1_segmentation(real_segm, pred_segm):
     for s in pred_segm.split('|'):
         pred.add((c, s))
         c += len(s)
-    recall = len(pred & real) / len(real)
-    precision = len(pred & real) / len(pred)
+    recall = 100 * len(pred & real) / len(real)
+    precision = 100 * len(pred & real) / len(pred)
+    pred_positives = len(pred)
+    grnd_positives = len(real)
+    true_positives = len(pred & real)
+
     if precision + recall == 0:
-        return (len(real&pred), 0)
+        return (true_positives, pred_positives, grnd_positives)
     f1_score = 2 * (precision * recall) / (precision + recall)
-    return (len(real&pred), f1_score)
+    return (true_positives, pred_positives, grnd_positives)
 
 def f1_breaks(true, predicted):
     real = set()
@@ -70,24 +75,17 @@ def f1_breaks(true, predicted):
     for s in predicted.split("|")[:-1]:
         c += len(s)
         pred.add(c)
+
     grnd_positives = len(real)
     pred_positives = len(pred)
     true_positives = len(pred & real)
-    # if prediction is correct count as if it is counting segments
-    if pred_positives == grnd_positives and true_positives == grnd_positives:
-        true_positives += 1
-        grnd_positives += 1
-        pred_positives += 1
-    else:  # or just count as if last segment is guessed incorectly
-        grnd_positives += 1
-        pred_positives += 1
+
     if real:
         recall = 100 * len(pred & real) / len(real)
     else:
         # monomorph - 0 if something predicted, 1 otherwise
         recall = 0 if pred else 100
         grnd_positives = 1
-        pred_positives = len(pred) if pred else 1
 
     if pred:
         precision = 100 * len(pred & real) / len(pred)
@@ -97,11 +95,10 @@ def f1_breaks(true, predicted):
         true_positives = 0 if real else 1
         pred_positives = 1
 
-
     if precision + recall == 0:
-        return (true_positives, 0)
-    f1_score = 2 * (precision * recall) / (precision + recall)
-    return (true_positives, f1_score)
+        return (true_positives, pred_positives, grnd_positives)
+    f2_score = 2 * (precision * recall) / (precision + recall)
+    return (true_positives, pred_positives, grnd_positives)
 
 # ROW MANIPULATION
 def appendData(ground, pred_seg):
@@ -144,14 +141,14 @@ def main(args):
 
 
 
-    word_by_word_table.sort()
+    #word_by_word_table.sort()
     table_data_frame = pd.DataFrame(word_by_word_table, columns=['category', 'word', 'segmentation', 'prediction',
-                                                                 'distance','overlaps', 'f1v2_overlaps', 'f1v2_score',
-                                                                 'f1v3_overlaps', 'f1v3_score'])
+                                                                 'distance','overlaps', 'f1v2_tp', 'f1v2_pp', 'f1v2_gp',
+                                                                 'f1v3_tp', 'f1v3_pp', 'f1v3_gp'])
 
     table_data_frame['category'] = table_data_frame['category'].apply('_{:03}'.format)
-    table_data_frame['f1v2_score'] = table_data_frame['f1v2_score'].apply('{:0.2f}'.format)
-    table_data_frame['f1v3_score'] = table_data_frame['f1v3_score'].apply('{:0.2f}'.format)
+    #table_data_frame['f1v2_sc'] = table_data_frame['f1v2_sc'].apply('{:0.2f}'.format)
+    #table_data_frame['f1v3_sc'] = table_data_frame['f1v3_sc'].apply('{:0.2f}'.format)
     table_data_frame.to_csv(args.out)
 
 
