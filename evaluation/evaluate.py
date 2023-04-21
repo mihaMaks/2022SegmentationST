@@ -147,10 +147,9 @@ def f1_ver3(true, predicted):
         c += len(s)
         pred.add(c)
 
-    true_positives = pred & real
-    false_positives = len(pred ^ (pred & real))
-    false_negatives = len(real ^ (pred & real))
     true_positives = len(true_positives)
+    false_positives = len(pred - real)
+    false_negatives = len(real - pred)
 
     if not real:
         # monomorph - 0 if something predicted, 1 otherwise
