@@ -64,7 +64,7 @@ def n_correct(gold_segments, guess_segments):
 
 
 def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_overlaps, f1v2_gold_lens, f1v2_pred_lens,
-                                                        f1v3_overlaps, f1v3_gold_lens, f1v3_pred_lens):
+                                                                            f1v3_tp, f1v3_fp, f1v3_fn):
     mean_dist = sum(dists) / len(dists)
     #n_corect
     total_overlaps = sum(overlaps)
@@ -89,10 +89,10 @@ def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_overlaps, f1v2_gol
         f1v2_score = 2 * f1v2_precision * f1v2_recall / (f1v2_precision + f1v2_recall)
 
     #f1_version3
-    f1v3_tp_sum = sum(f1v3_overlaps)
-    f1v3_pp_sum = sum(f1v3_pred_lens)
+    f1v3_tp_sum = sum(f1v3_tp)
+    f1v3_pp_sum = sum(f1v3_fp) + f1v3_tp_sum
     f1v3_precision = 100 * f1v3_tp_sum / f1v3_pp_sum
-    f1v3_gp_sum = sum(f1v3_gold_lens)
+    f1v3_gp_sum = sum(f1v3_fn) + f1v3_tp_sum
     f1v3_recall = 100 * f1v3_tp_sum / f1v3_gp_sum
     if f1v3_precision+f1v3_recall == 0:
         f1v3_score = .0
@@ -147,30 +147,20 @@ def f1_ver3(true, predicted):
         c += len(s)
         pred.add(c)
 
-    grnd_positives = len(real)
-    pred_positives = len(pred)
-    true_positives = len(pred & real)
+    true_positives = pred & real
+    false_positives = len(pred ^ (pred & real))
+    false_negatives = len(real ^ (pred & real))
+    true_positives = len(true_positives)
 
-    if real:
-        recall = 100 * len(pred & real) / len(real)
-    else:
+    if not real:
         # monomorph - 0 if something predicted, 1 otherwise
-        recall = 0 if pred else 100
-        grnd_positives = 1
+        true_positives = 0 if pred else 1
+        false_negatives = 1 if pred else 0
 
-    if pred:
-        precision = 100 * len(pred & real) / len(pred)
-    else:
-        # predicted monomorph - 0 if it should not be, 1 if it is
-        precision = 0 if real else 100
-        true_positives = 0 if real else 1
-        pred_positives = 1
+    if not pred:
+        false_positives = 1 if real else false_positives
 
-
-    if precision + recall == 0:
-        return (true_positives, pred_positives, grnd_positives)
-    f2_score = 2 * (precision * recall) / (precision + recall)
-    return (true_positives, pred_positives, grnd_positives)
+    return true_positives, false_positives, false_negatives
 
 
 def main(args):
@@ -190,13 +180,13 @@ def main(args):
                        in zip(gold_data["segments"], guess_data["segments"])]
 
     #f1_version3
-    f1v3_sc_pp_gp_tp = [f1_ver3(gold, guess)[0]
+    f1v3_tp = [f1_ver3(gold, guess)[0]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
-    f1v3_gold_lens = [f1_ver3(gold, guess)[2]
+    f1v3_fn = [f1_ver3(gold, guess)[2]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
-    f1v3_pred_lens = [f1_ver3(gold, guess)[1]
+    f1v3_fp = [f1_ver3(gold, guess)[1]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
     # levenshtein distance can be computed separately for each pair
@@ -223,9 +213,9 @@ def main(args):
         f1v2_gold_ovelaps_by_cat = stratify(f1v2_gold_lens, categories)
         f1v2_pred_overlaps_by_cat = stratify(f1v2_pred_lens, categories)
 
-        f1v3_overlaps_by_cat = stratify(f1v3_sc_pp_gp_tp, categories)
-        f1v3_gold_ovelaps_by_cat = stratify(f1v3_gold_lens, categories)
-        f1v3_pred_overlaps_by_cat = stratify(f1v3_pred_lens, categories)
+        f1v3_tp_by_cat = stratify(f1v3_tp, categories)
+        f1v3_fp_by_cat = stratify(f1v3_fp, categories)
+        f1v3_fn_by_cat = stratify(f1v3_fn, categories)
 
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
@@ -238,14 +228,14 @@ def main(args):
                 f1v2_gold_ovelaps_by_cat[cat],
                 f1v2_pred_overlaps_by_cat[cat],
 
-                f1v3_overlaps_by_cat[cat],
-                f1v3_gold_ovelaps_by_cat[cat],
-                f1v3_pred_overlaps_by_cat[cat]
+                f1v3_tp_by_cat[cat],
+                f1v3_fp_by_cat[cat],
+                f1v3_fn_by_cat[cat]
             )
             print_numbers(cat_stats, cat=cat)
 
     overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1v2_sc_pp_gp_tp, f1v2_gold_lens, f1v2_pred_lens,
-                                                                           f1v3_sc_pp_gp_tp, f1v3_gold_lens, f1v3_pred_lens)
+                                                                           f1v3_tp, f1v3_fp, f1v3_fn)
     print_numbers(overall_stats)
 
 
