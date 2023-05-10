@@ -61,39 +61,52 @@ def f1_ver2(real_segm, pred_segm):
 
     return true_positives, false_positives, false_negatives
 
-def f1_ver3(true, predicted):
-    real = set()
-    pred = set()
-    c = 0
-    for s in true.split("|")[:-1]:
-        c += len(s)
-        real.add(c)
-    c = 0
-    for s in predicted.split("|")[:-1]:
-        c += len(s)
-        pred.add(c)
+def f1_ver3(real_segm, pred_segm):
+    true_positives = false_positives = false_negatives = 0
+    letter_pairs_r = set()
+    letter_pairs_p = set()
+    r = 1
+    for i, l in enumerate(real_segm):
+        if l == '|':
+            letter_pairs_r.add(i - r)
+            r += 1
+    p = 1
+    for i, l in enumerate(pred_segm):
+        if l == '|':
+            letter_pairs_p.add(i - p)
+            p += 1
+    true_positives = len(letter_pairs_p & letter_pairs_r)
+    false_positives = len(letter_pairs_p - letter_pairs_r)
+    false_negatives = len(letter_pairs_r - letter_pairs_p)
 
-    true_positives = len(pred&real)
-    false_positives = len(pred - real)
-    false_negatives = len(real - pred)
-
-    if not real:
-        # monomorph - 0 if something predicted, 1 otherwise
-        true_positives = 0 if pred else 1
-        false_negatives = 1 if pred else 0
-
-    if not pred:
-        false_positives = 1 if real else false_positives
+    # word is monomorph
+    if not letter_pairs_r:
+        true_positives = 0 if letter_pairs_p else 1
+        false_negatives = 1 if letter_pairs_p else 0
+    # word is predicted as monomprh
+    if not letter_pairs_p:
+        false_positives = 1 if letter_pairs_r else false_positives
 
     return true_positives, false_positives, false_negatives
+
 
 # ROW MANIPULATION
 def appendData(ground, pred_seg):
     row_dat = list()
     row_dat.append(ground[2])  # category
     row_dat.append(ground[0])  # word
-    row_dat.append(ground[1].lower())  # segmentation
-    row_dat.append(pred_seg)  # prediction
+    # segmentation
+    grnd = ground[1]
+    grnd = grnd.replace(" - ", "|")
+    grnd = grnd.replace(" @@", "|")
+    grnd = grnd.replace(" ", "|")
+    row_dat.append(grnd.lower())
+    # prediction
+    pred = pred_seg
+    pred = pred.replace(" - ", "|")
+    pred = pred.replace(" @@", "|")
+    pred = pred.replace(" ", "|")
+    row_dat.append(pred)
     return row_dat
 
 
@@ -101,15 +114,52 @@ def appendMetrics(ground, pred_seg):
     row_met = list()
     gold_segments = ground[1].replace(" @@", "|")
     gold_segments = gold_segments.replace(" ", "|")
+    gold_segments = gold_segments.replace(" - ", "|")
+
     guess_segments = pred_seg.replace(" @@", "|")
     guess_segments = guess_segments.replace(" ", "|")
+    guess_segments = guess_segments.replace(" - ", "|")
     gold_segments = gold_segments.lower()
     row_met.append(distance(gold_segments, guess_segments))
-    row_met.append(n_correct(gold_segments, guess_segments))
-    for met in f1_ver2(gold_segments, guess_segments):
-        row_met.append(met)
-    for met in f1_ver3(gold_segments, guess_segments):
-        row_met.append(met)
+
+
+    #row_met.append(n_correct(gold_segments, guess_segments))
+
+    #callculate instance-f1-score
+    tp_fp_fn_v2 = f1_ver2(gold_segments, guess_segments)
+    precision = 0
+    if tp_fp_fn_v2[1] + tp_fp_fn_v2[0] != 0:
+        precision = tp_fp_fn_v2[0] / (tp_fp_fn_v2[0] + tp_fp_fn_v2[1])
+    recall = 0
+    if tp_fp_fn_v2[2] + tp_fp_fn_v2[0] != 0:
+        recall = tp_fp_fn_v2[0] / (tp_fp_fn_v2[0] + tp_fp_fn_v2[2])
+    if precision + recall == 0:
+        f1_score_v2 = .0
+    else:
+        f1_score_v2 = 2 * precision * recall / (precision + recall)
+    row_met.append(tp_fp_fn_v2[0])
+    row_met.append(tp_fp_fn_v2[1])
+    row_met.append(tp_fp_fn_v2[2])
+
+    # callculate instance-f1-score
+    tp_fp_fn_v3 = f1_ver3(gold_segments, guess_segments)
+    precision = 0
+    if tp_fp_fn_v3[1] + tp_fp_fn_v3[0] != 0:
+        precision = tp_fp_fn_v3[0] / (tp_fp_fn_v3[0] + tp_fp_fn_v3[1])
+    recall = 0
+    if tp_fp_fn_v3[2] + tp_fp_fn_v3[0] != 0:
+        recall = tp_fp_fn_v3[0] / (tp_fp_fn_v3[0] + tp_fp_fn_v3[2])
+    if precision + recall == 0:
+        f1_score_v3 = .0
+    else:
+        f1_score_v3 = 2 * precision * recall / (precision + recall)
+    row_met.append(tp_fp_fn_v3[0])
+    row_met.append(tp_fp_fn_v3[1])
+    row_met.append(tp_fp_fn_v3[2])
+
+    row_met.append(round(f1_score_v2, 3))
+    row_met.append(round(f1_score_v3, 3))
+    row_met.append(abs(round(f1_score_v3 - f1_score_v2, 3)))
 
     return row_met
 
@@ -130,8 +180,9 @@ def main(args):
 
     word_by_word_table.sort()
     table_data_frame = pd.DataFrame(word_by_word_table, columns=['category', 'word', 'segmentation', 'prediction',
-                                                                 'distance','overlaps', 'f1v2_tp', 'f1v2_fp', 'f1v2_fn',
-                                                                 'f1v3_tp', 'f1v3_fp', 'f1v3_fn'])
+                                                                 'distance', 'f1v2_tp', 'f1v2_fp', 'f1v2_fn',
+                                                                 'f1v3_tp', 'f1v3_fp', 'f1v3_fn',
+                                                                 'f1v2_score', 'f1v3_score', 'abs_diff'])
 
     table_data_frame['category'] = table_data_frame['category'].apply('_{:03}'.format)
     table_data_frame.to_csv(args.out)
