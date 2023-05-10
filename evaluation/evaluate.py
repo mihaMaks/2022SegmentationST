@@ -44,6 +44,7 @@ def read_tsv(path, category):
             fields = line.rstrip("\n").split("\t")
             for name, field in zip(col_names, fields):
                 if name == "segments":
+                    field = field.replace(' - ', '|')
                     field = field.replace(' @@', '|')
                     field = field.replace(' ', '|')
                     field = field.lower()
@@ -63,7 +64,7 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 
-def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_fn, f1v3_tp, f1v3_fp, f1v3_fn):
+def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_fn, f1v3_tp, f1v3_fp, f1v3_fn, f1v4_tp, f1v4_fp, f1v4_fn):
     mean_dist = sum(dists) / len(dists)
     #f1_original (n_corect)
     total_overlaps = sum(overlaps)
@@ -92,20 +93,38 @@ def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_
     f1v3_pp_sum = sum(f1v3_fp) + f1v3_tp_sum
     f1v3_precision = 100 * f1v3_tp_sum / f1v3_pp_sum
     f1v3_gp_sum = sum(f1v3_fn) + f1v3_tp_sum
-    f1v3_recall = 100 * f1v3_tp_sum / f1v3_gp_sum
+    f1v3_recall = 100
+    if(f1v3_gp_sum != 0):
+        f1v3_recall = 100 * f1v3_tp_sum / f1v3_gp_sum
+
     if f1v3_precision+f1v3_recall == 0:
         f1v3_score = .0
     else:
         f1v3_score = 2 * f1v3_precision * f1v3_recall / (f1v3_precision + f1v3_recall)
 
-    return {"distance": mean_dist,  "f_ver1": f_measure, "f1_ver2": f1v2_score,"f1_ver3": f1v3_score,
-            "ver1_precision": precision, "ver2_precision": f1v2_precision, "ver3_precision": f1v3_precision,
-            "ver1_recall": recall, "ver2_recall": f1v2_recall, "ver3_recall": f1v3_recall,
-            "f1v1_pp_sum": pred_lens_sum, "f1v2_pp_sum": f1v2_pp_sum, "f1v3_pp_sum": f1v3_pp_sum,
-            "f1v1_gp_sum": gold_lens_sum, "f1v2_gp_sum": f1v2_gp_sum, "f1v3_gp_sum": f1v3_gp_sum,
-            "f1v1_tp_sum": total_overlaps, "f1v2_tp_sum": f1v2_tp_sum, "f1v3_tp_sum": f1v3_tp_sum}
+    #f1_version4
+    f1v4_tp_sum = sum(f1v4_tp)
+    f1v4_pp_sum = sum(f1v4_fp) + f1v4_tp_sum
+    f1v4_precision = 100 * f1v4_tp_sum / f1v4_pp_sum
+    f1v4_gp_sum = sum(f1v4_fn) + f1v4_tp_sum
+    f1v4_recall = 100
+    if (f1v4_gp_sum != 0):
+        f1v4_recall = 100 * f1v4_tp_sum / f1v4_gp_sum
 
+    if f1v4_precision + f1v4_recall == 0:
+        f1v4_score = .0
+    else:
+        f1v4_score = 2 * f1v4_precision * f1v4_recall / (f1v4_precision + f1v4_recall)
 
+    return {"distance": mean_dist,  "f_ver1": f_measure, "f1_ver2": f1v2_score,"f1_ver3": f1v3_score, "f1_ver4": f1v4_score,
+            "ver1_precision": precision, "ver2_precision": f1v2_precision, "ver3_precision": f1v3_precision, "f1v4_precision": f1v4_precision,
+            "ver1_recall": recall, "ver2_recall": f1v2_recall, "ver3_recall": f1v3_recall, "ver4_recall": f1v4_recall}
+
+"""
+            "f1v1_pp_sum": pred_lens_sum, "f1v2_pp_sum": f1v2_pp_sum, "f1v3_pp_sum": f1v3_pp_sum, "f1v4_pp_sum": f1v4_pp_sum,
+            "f1v1_gp_sum": gold_lens_sum, "f1v2_gp_sum": f1v2_gp_sum, "f1v3_gp_sum": f1v3_gp_sum, "f1v4_gp_sum": f1v4_gp_sum,
+            "f1v1_tp_sum": total_overlaps, "f1v2_tp_sum": f1v2_tp_sum, "f1v3_tp_sum": f1v3_tp_sum, "f1v4_tp_sum": f1v4_tp_sum
+"""
 def stratify(sequence, labels):
     assert len(sequence) == len(labels)
     by_label = defaultdict(list)
@@ -129,8 +148,8 @@ def f1_ver2(real_segm, pred_segm):
     false_positives = len(pred - real)
     false_negatives = len(real - pred)
 
-
     return true_positives, false_positives, false_negatives
+
 def f1_ver3(true, predicted):
     real = set()
     pred = set()
@@ -154,6 +173,34 @@ def f1_ver3(true, predicted):
 
     if not pred:
         false_positives = 1 if real else false_positives
+
+    return true_positives, false_positives, false_negatives
+
+def f1_ver4(real_segm, pred_segm):
+    true_positives = false_positives = false_negatives = 0
+    letter_pairs_r = set()
+    letter_pairs_p = set()
+    r = 1
+    for i, l in enumerate(real_segm):
+        if l == '|':
+            letter_pairs_r.add(i - r)
+            r += 1
+    p = 1
+    for i, l in enumerate(pred_segm):
+        if l == '|':
+            letter_pairs_p.add(i - p)
+            p += 1
+    true_positives = len(letter_pairs_p & letter_pairs_r)
+    false_positives = len(letter_pairs_p - letter_pairs_r)
+    false_negatives = len(letter_pairs_r - letter_pairs_p)
+
+    # word is monomorph
+    if not letter_pairs_r:
+        true_positives = 0 if letter_pairs_p else 1
+        false_negatives = 1 if letter_pairs_p else 0
+    # word is predicted as monomprh
+    if not letter_pairs_p:
+        false_positives = 1 if letter_pairs_r else false_positives
 
     return true_positives, false_positives, false_negatives
 
@@ -189,6 +236,18 @@ def main(args):
     f1v3_fn = [f1_ver3(gold, guess)[2]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
+    #f1_ver4
+    f1v4_tp = [f1_ver4(gold, guess)[0]
+               for gold, guess
+               in zip(gold_data["segments"], guess_data["segments"])]
+
+    f1v4_fp = [f1_ver4(gold, guess)[1]
+               for gold, guess
+               in zip(gold_data["segments"], guess_data["segments"])]
+
+    f1v4_fn = [f1_ver4(gold, guess)[2]
+               for gold, guess
+               in zip(gold_data["segments"], guess_data["segments"])]
 
     # levenshtein distance can be computed separately for each pair
     dists = [distance(gold, guess)
@@ -218,6 +277,10 @@ def main(args):
         f1v3_fp_by_cat = stratify(f1v3_fp, categories)
         f1v3_fn_by_cat = stratify(f1v3_fn, categories)
 
+        f1v4_tp_by_cat = stratify(f1v4_tp, categories)
+        f1v4_fp_by_cat = stratify(f1v4_fp, categories)
+        f1v4_fn_by_cat = stratify(f1v4_fn, categories)
+
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
                 dists_by_cat[cat],
@@ -231,12 +294,18 @@ def main(args):
 
                 f1v3_tp_by_cat[cat],
                 f1v3_fp_by_cat[cat],
-                f1v3_fn_by_cat[cat]
+                f1v3_fn_by_cat[cat],
+
+                f1v4_tp_by_cat[cat],
+                f1v4_fp_by_cat[cat],
+                f1v4_fn_by_cat[cat]
+
+
             )
             print_numbers(cat_stats, cat=cat)
 
     overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_fn,
-                                                                           f1v3_tp, f1v3_fp, f1v3_fn)
+                                                f1v3_tp, f1v3_fp, f1v3_fn, f1v4_tp, f1v4_fp, f1v4_fn)
     print_numbers(overall_stats)
 
 
