@@ -2,6 +2,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from unidecode import unidecode
 
 # write a .csv file :
 # command: python3 word_by_word_eval.py --guess ../baseline/eng.word.dev.bert.tsv --gold ../data/eng.word.dev.tsv --out word_by_word_metrics.csv
@@ -10,6 +11,26 @@ columns:        index|word|segmentation|prediction|distance|n_correct|f1_segment
 
 run metrics for every word and write them in a .csv
 """
+
+
+def compare_len(real_segm, pred_segm):
+    real = set()
+    pred = set()
+    c = 0
+    for s in real_segm.split('|'):
+        real.add((c, s))
+        c += len(s)
+    r_len = c
+
+    c = 0
+    for s in pred_segm.split('|'):
+        pred.add((c, s))
+        c += len(s)
+    p_len = c
+
+    if r_len != p_len:
+        return False
+    return True
 
 
 # METRICS
@@ -30,7 +51,11 @@ def distance(str1, str2):
             m[x, y] = min(m[x - 1, y] + 1, m[x, y - 1] + 1, m[x - 1, y - 1] + dg)
     return m[len(str2), len(str1)]
 
+
 def n_correct(gold_segments, guess_segments):
+    if not compare_len(gold_segments, guess_segments):
+        return -1
+
     a = gold_segments.split("|")
     b = guess_segments.split("|")
     table = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
@@ -41,7 +66,11 @@ def n_correct(gold_segments, guess_segments):
                 max(table[i][j - 1], table[i - 1][j]))
     return table[-1][-1]
 
+
 def f1_ver2(real_segm, pred_segm):
+    if not compare_len(real_segm, pred_segm):
+        return 0, 0, 0
+
     real_segm = real_segm.lower()
     real = set()
     pred = set()
@@ -49,20 +78,24 @@ def f1_ver2(real_segm, pred_segm):
     for s in real_segm.split('|'):
         real.add((c, s))
         c += len(s)
+
     c = 0
     for s in pred_segm.split('|'):
         pred.add((c, s))
         c += len(s)
 
-    true_positives = len(pred&real)
+    true_positives = len(pred & real)
     false_positives = len(pred - real)
     false_negatives = len(real - pred)
 
-
     return true_positives, false_positives, false_negatives
+
 
 def f1_ver3(real_segm, pred_segm):
     true_positives = false_positives = false_negatives = 0
+    if not compare_len(real_segm, pred_segm):
+        return 0, 0, 0
+
     letter_pairs_r = set()
     letter_pairs_p = set()
     r = 1
@@ -100,32 +133,36 @@ def appendData(ground, pred_seg):
     grnd = grnd.replace(" - ", "|")
     grnd = grnd.replace(" @@", "|")
     grnd = grnd.replace(" ", "|")
+    grnd = unidecode(grnd)
     row_dat.append(grnd.lower())
+
     # prediction
     pred = pred_seg
     pred = pred.replace(" - ", "|")
     pred = pred.replace(" @@", "|")
     pred = pred.replace(" ", "|")
+    pred = unidecode(pred)
     row_dat.append(pred)
     return row_dat
 
 
 def appendMetrics(ground, pred_seg):
     row_met = list()
-    gold_segments = ground[1].replace(" @@", "|")
+    gold_segments = ground[1].replace(" - ", "|")
+    gold_segments = gold_segments.replace(" @@", "|")
     gold_segments = gold_segments.replace(" ", "|")
-    gold_segments = gold_segments.replace(" - ", "|")
+    gold_segments = unidecode(gold_segments)
 
-    guess_segments = pred_seg.replace(" @@", "|")
+    guess_segments = pred_seg.replace(" - ", "|")
+    guess_segments = guess_segments.replace(" @@", "|")
     guess_segments = guess_segments.replace(" ", "|")
-    guess_segments = guess_segments.replace(" - ", "|")
+    guess_segments = unidecode(guess_segments)
     gold_segments = gold_segments.lower()
     row_met.append(distance(gold_segments, guess_segments))
 
+    row_met.append(n_correct(gold_segments, guess_segments))
 
-    #row_met.append(n_correct(gold_segments, guess_segments))
-
-    #callculate instance-f1-score
+    # callculate instance-f1-score
     tp_fp_fn_v2 = f1_ver2(gold_segments, guess_segments)
     precision = 0
     if tp_fp_fn_v2[1] + tp_fp_fn_v2[0] != 0:
@@ -159,9 +196,10 @@ def appendMetrics(ground, pred_seg):
 
     row_met.append(round(f1_score_v2, 3))
     row_met.append(round(f1_score_v3, 3))
-    row_met.append(abs(round(f1_score_v3 - f1_score_v2, 3)))
+    row_met.append(abs(round((f1_score_v3 - f1_score_v2), 3)))
 
     return row_met
+
 
 def main(args):
     ground_truth = pd.read_table(args.gold, names=['word', 'segmentation', 'category'], dtype={'category': str})
@@ -176,11 +214,10 @@ def main(args):
         row_data.extend(row_metrics)
         word_by_word_table.append(row_data)
 
-
-
     word_by_word_table.sort()
     table_data_frame = pd.DataFrame(word_by_word_table, columns=['category', 'word', 'segmentation', 'prediction',
-                                                                 'distance', 'f1v2_tp', 'f1v2_fp', 'f1v2_fn',
+                                                                 'distance', 'overlaps',
+                                                                 'f1v2_tp', 'f1v2_fp', 'f1v2_fn',
                                                                  'f1v3_tp', 'f1v3_fp', 'f1v3_fn',
                                                                  'f1v2_score', 'f1v3_score', 'abs_diff'])
 
