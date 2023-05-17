@@ -6,6 +6,27 @@ Returns precision, recall, f-measure, and mean Levenhstein distance.
 
 from collections import defaultdict
 import numpy as np
+from unidecode import unidecode
+
+
+def compare_len(real_segm, pred_segm):
+    real = set()
+    pred = set()
+    c = 0
+    for s in real_segm.split('|'):
+        real.add((c, s))
+        c += len(s)
+    r_len = c
+
+    c = 0
+    for s in pred_segm.split('|'):
+        pred.add((c, s))
+        c += len(s)
+    p_len = c
+
+    if r_len != p_len:
+        return False
+    return True
 
 
 def distance(str1, str2):
@@ -25,34 +46,10 @@ def distance(str1, str2):
     return m[len(str2), len(str1)]
 
 
-def print_numbers(stats_dict, cat="all"):
-    print("\n")
-    print("category:", cat)
-                        #sorted(stats_dict.items())
-    for stat_name, stat in stats_dict.items():
-        print("\t".join([stat_name, "{:.3f}".format(stat)]))
-
-
-def read_tsv(path, category):
-    # tsv without header
-    col_names = ["word", "segments"]
-    if category:
-        col_names.append("category")
-    data = {name: [] for name in col_names}
-    with open(path, encoding='utf-8') as f:
-        for line in f:
-            fields = line.rstrip("\n").split("\t")
-            for name, field in zip(col_names, fields):
-                if name == "segments":
-                    field = field.replace(' - ', '|')
-                    field = field.replace(' @@', '|')
-                    field = field.replace(' ', '|')
-                    field = field.lower()
-                data[name].append(field)
-    return data
-
-
 def n_correct(gold_segments, guess_segments):
+    if not compare_len(gold_segments, guess_segments):
+        return 0
+
     a = gold_segments.split("|")
     b = guess_segments.split("|")
     table = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
@@ -64,74 +61,10 @@ def n_correct(gold_segments, guess_segments):
     return table[-1][-1]
 
 
-def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_fn, f1v3_tp, f1v3_fp, f1v3_fn, f1v4_tp, f1v4_fp, f1v4_fn):
-    mean_dist = sum(dists) / len(dists)
-    #f1_original (n_corect)
-    total_overlaps = sum(overlaps)
-    pred_lens_sum = sum(pred_lens)
-    gold_lens_sum = sum(gold_lens)
-    precision = 100 * total_overlaps / pred_lens_sum
-    recall = 100 * total_overlaps / gold_lens_sum
-    if precision+recall == 0:
-        f_measure = .0
-    else:
-        f_measure = 2 * precision * recall / (precision + recall)
-
-    #f1_version2
-    f1v2_tp_sum = sum(f1v2_tp)
-    f1v2_pp_sum = sum(f1v2_fp) + f1v2_tp_sum
-    f1v2_precision = 100 * f1v2_tp_sum / f1v2_pp_sum
-    f1v2_gp_sum = sum(f1v2_fn) + f1v2_tp_sum
-    f1v2_recall = 100 * f1v2_tp_sum / f1v2_gp_sum
-    if f1v2_precision+f1v2_recall == 0:
-        f1v2_score = .0
-    else:
-        f1v2_score = 2 * f1v2_precision * f1v2_recall / (f1v2_precision + f1v2_recall)
-
-    #f1_version3
-    f1v3_tp_sum = sum(f1v3_tp)
-    f1v3_pp_sum = sum(f1v3_fp) + f1v3_tp_sum
-    f1v3_precision = 100 * f1v3_tp_sum / f1v3_pp_sum
-    f1v3_gp_sum = sum(f1v3_fn) + f1v3_tp_sum
-    f1v3_recall = 100
-    if(f1v3_gp_sum != 0):
-        f1v3_recall = 100 * f1v3_tp_sum / f1v3_gp_sum
-
-    if f1v3_precision+f1v3_recall == 0:
-        f1v3_score = .0
-    else:
-        f1v3_score = 2 * f1v3_precision * f1v3_recall / (f1v3_precision + f1v3_recall)
-
-    #f1_version4
-    f1v4_tp_sum = sum(f1v4_tp)
-    f1v4_pp_sum = sum(f1v4_fp) + f1v4_tp_sum
-    f1v4_precision = 100 * f1v4_tp_sum / f1v4_pp_sum
-    f1v4_gp_sum = sum(f1v4_fn) + f1v4_tp_sum
-    f1v4_recall = 100
-    if (f1v4_gp_sum != 0):
-        f1v4_recall = 100 * f1v4_tp_sum / f1v4_gp_sum
-
-    if f1v4_precision + f1v4_recall == 0:
-        f1v4_score = .0
-    else:
-        f1v4_score = 2 * f1v4_precision * f1v4_recall / (f1v4_precision + f1v4_recall)
-
-    return {"distance": mean_dist,  "f_ver1": f_measure, "f1_ver2": f1v2_score,"f1_ver3": f1v3_score, "f1_ver4": f1v4_score,
-            "ver1_precision": precision, "ver2_precision": f1v2_precision, "ver3_precision": f1v3_precision, "f1v4_precision": f1v4_precision,
-            "ver1_recall": recall, "ver2_recall": f1v2_recall, "ver3_recall": f1v3_recall, "ver4_recall": f1v4_recall}
-
-"""
-            "f1v1_pp_sum": pred_lens_sum, "f1v2_pp_sum": f1v2_pp_sum, "f1v3_pp_sum": f1v3_pp_sum, "f1v4_pp_sum": f1v4_pp_sum,
-            "f1v1_gp_sum": gold_lens_sum, "f1v2_gp_sum": f1v2_gp_sum, "f1v3_gp_sum": f1v3_gp_sum, "f1v4_gp_sum": f1v4_gp_sum,
-            "f1v1_tp_sum": total_overlaps, "f1v2_tp_sum": f1v2_tp_sum, "f1v3_tp_sum": f1v3_tp_sum, "f1v4_tp_sum": f1v4_tp_sum
-"""
-def stratify(sequence, labels):
-    assert len(sequence) == len(labels)
-    by_label = defaultdict(list)
-    for label, value in zip(labels, sequence):
-        by_label[label].append(value)
-    return by_label
 def f1_ver2(real_segm, pred_segm):
+    if not compare_len(real_segm, pred_segm):
+        return 0, 0, 0
+
     real_segm = real_segm.lower()
     real = set()
     pred = set()
@@ -144,25 +77,29 @@ def f1_ver2(real_segm, pred_segm):
         pred.add((c, s))
         c += len(s)
 
-    true_positives = len(pred&real)
+    true_positives = len(pred & real)
     false_positives = len(pred - real)
     false_negatives = len(real - pred)
 
     return true_positives, false_positives, false_negatives
 
-def f1_ver3(true, predicted):
+
+def f1_ver3(real_segm, pred_segm):
+    if not compare_len(real_segm, pred_segm):
+        return 0, 0, 0
+
     real = set()
     pred = set()
     c = 0
-    for s in true.split("|")[:-1]:
+    for s in real_segm.split("|")[:-1]:
         c += len(s)
         real.add(c)
     c = 0
-    for s in predicted.split("|")[:-1]:
+    for s in pred_segm.split("|")[:-1]:
         c += len(s)
         pred.add(c)
 
-    true_positives = len(pred&real)
+    true_positives = len(pred & real)
     false_positives = len(pred - real)
     false_negatives = len(real - pred)
 
@@ -176,7 +113,11 @@ def f1_ver3(true, predicted):
 
     return true_positives, false_positives, false_negatives
 
+
 def f1_ver4(real_segm, pred_segm):
+    if not compare_len(real_segm, pred_segm):
+        return 0, 0, 0
+
     true_positives = false_positives = false_negatives = 0
     letter_pairs_r = set()
     letter_pairs_p = set()
@@ -205,12 +146,111 @@ def f1_ver4(real_segm, pred_segm):
     return true_positives, false_positives, false_negatives
 
 
+def print_numbers(stats_dict, cat="all"):
+    print("\n")
+    print("category:", cat)
+                        # sorted(stats_dict.items())
+    for stat_name, stat in stats_dict.items():
+        print("\t".join([stat_name, "{:.3f}".format(stat)]))
+
+
+def read_tsv(path, category):
+    # tsv without header
+    col_names = ["word", "segments"]
+    if category:
+        col_names.append("category")
+    data = {name: [] for name in col_names}
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            fields = line.rstrip("\n").split("\t")
+            for name, field in zip(col_names, fields):
+                if name == "segments":
+                    field = field.replace(' - ', '|')
+                    field = field.replace(' @@', '|')
+                    field = field.replace(' ', '|')
+                    field = unidecode(field)
+                    field = field.lower()
+                data[name].append(field)
+    return data
+
+
+def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_fn, f1v3_tp, f1v3_fp, f1v3_fn, f1v4_tp, f1v4_fp, f1v4_fn):
+    mean_dist = sum(dists) / len(dists)
+    # f1_original (n_corect)
+    total_overlaps = sum(overlaps)
+    pred_lens_sum = sum(pred_lens)
+    gold_lens_sum = sum(gold_lens)
+    precision = 100 * total_overlaps / pred_lens_sum
+    recall = 100 * total_overlaps / gold_lens_sum
+    if precision+recall == 0:
+        f_measure = .0
+    else:
+        f_measure = 2 * precision * recall / (precision + recall)
+
+    # f1_version2
+    f1v2_tp_sum = sum(f1v2_tp)
+    f1v2_pp_sum = sum(f1v2_fp) + f1v2_tp_sum
+    f1v2_precision = 100 * f1v2_tp_sum / f1v2_pp_sum
+    f1v2_gp_sum = sum(f1v2_fn) + f1v2_tp_sum
+    f1v2_recall = 100 * f1v2_tp_sum / f1v2_gp_sum
+    if f1v2_precision+f1v2_recall == 0:
+        f1v2_score = .0
+    else:
+        f1v2_score = 2 * f1v2_precision * f1v2_recall / (f1v2_precision + f1v2_recall)
+
+    # f1_version3
+    f1v3_tp_sum = sum(f1v3_tp)
+    f1v3_pp_sum = sum(f1v3_fp) + f1v3_tp_sum
+    f1v3_precision = 100 * f1v3_tp_sum / f1v3_pp_sum
+    f1v3_gp_sum = sum(f1v3_fn) + f1v3_tp_sum
+    f1v3_recall = 100
+    if f1v3_gp_sum != 0:
+        f1v3_recall = 100 * f1v3_tp_sum / f1v3_gp_sum
+
+    if f1v3_precision+f1v3_recall == 0:
+        f1v3_score = .0
+    else:
+        f1v3_score = 2 * f1v3_precision * f1v3_recall / (f1v3_precision + f1v3_recall)
+
+    # f1_version4
+    f1v4_tp_sum = sum(f1v4_tp)
+    f1v4_pp_sum = sum(f1v4_fp) + f1v4_tp_sum
+    f1v4_precision = 100 * f1v4_tp_sum / f1v4_pp_sum
+    f1v4_gp_sum = sum(f1v4_fn) + f1v4_tp_sum
+    f1v4_recall = 100
+    if f1v4_gp_sum != 0:
+        f1v4_recall = 100 * f1v4_tp_sum / f1v4_gp_sum
+
+    if f1v4_precision + f1v4_recall == 0:
+        f1v4_score = .0
+    else:
+        f1v4_score = 2 * f1v4_precision * f1v4_recall / (f1v4_precision + f1v4_recall)
+
+    return {"distance": mean_dist,  "f_ver1": f_measure, "f1_ver2": f1v2_score,"f1_ver3": f1v3_score, "f1_ver4": f1v4_score,
+            "ver1_precision": precision, "ver2_precision": f1v2_precision, "ver3_precision": f1v3_precision, "f1v4_precision": f1v4_precision,
+            "ver1_recall": recall, "ver2_recall": f1v2_recall, "ver3_recall": f1v3_recall, "ver4_recall": f1v4_recall}
+
+"""
+            "f1v1_pp_sum": pred_lens_sum, "f1v2_pp_sum": f1v2_pp_sum, "f1v3_pp_sum": f1v3_pp_sum, "f1v4_pp_sum": f1v4_pp_sum,
+            "f1v1_gp_sum": gold_lens_sum, "f1v2_gp_sum": f1v2_gp_sum, "f1v3_gp_sum": f1v3_gp_sum, "f1v4_gp_sum": f1v4_gp_sum,
+            "f1v1_tp_sum": total_overlaps, "f1v2_tp_sum": f1v2_tp_sum, "f1v3_tp_sum": f1v3_tp_sum, "f1v4_tp_sum": f1v4_tp_sum
+"""
+
+
+def stratify(sequence, labels):
+    assert len(sequence) == len(labels)
+    by_label = defaultdict(list)
+    for label, value in zip(labels, sequence):
+        by_label[label].append(value)
+    return by_label
+
+
 def main(args):
     gold_data = read_tsv(args.gold, args.category)
     guess_data = read_tsv(args.guess, False)  # only second column is needed
     assert len(gold_data["segments"]) == len(guess_data["segments"]), \
         "gold and guess tsvs do not have the same number of entries"
-    #f1_version2
+    # f1_version2
     f1v2_tp = [f1_ver2(gold, guess)[0]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
@@ -224,7 +264,7 @@ def main(args):
                        in zip(gold_data["segments"], guess_data["segments"])]
 
 
-    #f1_version3
+    # f1_version3
     f1v3_tp = [f1_ver3(gold, guess)[0]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
@@ -236,7 +276,7 @@ def main(args):
     f1v3_fn = [f1_ver3(gold, guess)[2]
                        for gold, guess
                        in zip(gold_data["segments"], guess_data["segments"])]
-    #f1_ver4
+    # f1_ver4
     f1v4_tp = [f1_ver4(gold, guess)[0]
                for gold, guess
                in zip(gold_data["segments"], guess_data["segments"])]
