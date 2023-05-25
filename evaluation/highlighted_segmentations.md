@@ -54,6 +54,16 @@ below are some examples from different categories.
 | 101	     | battlegrounds      | 	battle#ground#s        | 	battle#grounds        | 	1        | 	1       | 	1      | 	1	     | 2       | 	1      | 	0	     | 1       | 	0.4	       | 667        | 	267     |
 | 110	     | transcendentalisms | 	transcend#ent#al#ism#s | 	trans#cend#ental#isms | 	3        | 	0	      | 0	      | 4	      | 5	      | 2       | 	1	     | 2	      | 0.0	571	571 |
 
+## comparing original f1 metric with f1_ver2
+
+At first it looked like original f1 metric is scoring worse than proposed f1_ver2 metric.  
+That seemed strange. In fact it was wrong because original metric was not implemented 
+correctly after changes i made to the code. It was counting excluded segmentations in a way that  
+penalised the metric significantly. At */evaluation/ver1_ver2_diff.csv* is a table of all instances  
+where original f1 scores better because of mismatched segments.
+
+
+
 ### English - BERT Tokenizer (uncased)
 
 Here is a table for better understanding of word categorisation.
