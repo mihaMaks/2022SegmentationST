@@ -12,19 +12,23 @@ from unidecode import unidecode
 def compare_len(real_segm, pred_segm):
     real = set()
     pred = set()
+    real_str = ""
+    pred_str = ""
     c = 0
     for s in real_segm.split('|'):
         real.add((c, s))
+        real_str += s
         c += len(s)
     r_len = c
 
     c = 0
     for s in pred_segm.split('|'):
         pred.add((c, s))
+        pred_str += s
         c += len(s)
     p_len = c
 
-    if r_len != p_len:
+    if r_len != p_len or real_str != pred_str:
         return False
     return True
 
@@ -48,7 +52,7 @@ def distance(str1, str2):
 
 def n_correct(gold_segments, guess_segments):
     if not compare_len(gold_segments, guess_segments):
-        return 0
+        return 0, 0, 0
 
     a = gold_segments.split("|")
     b = guess_segments.split("|")
@@ -58,7 +62,7 @@ def n_correct(gold_segments, guess_segments):
             table[i][j] = (
                 table[i - 1][j - 1] + 1 if ca == cb else
                 max(table[i][j - 1], table[i - 1][j]))
-    return table[-1][-1]
+    return table[-1][-1], (len(guess_segments.split('|')) - table[-1][-1]), (len(gold_segments.split('|')) - table[-1][-1])
 
 
 def f1_ver2(real_segm, pred_segm):
@@ -180,8 +184,8 @@ def compute_stats(dists, overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_
     total_overlaps = sum(overlaps)
     pred_lens_sum = sum(pred_lens)
     gold_lens_sum = sum(gold_lens)
-    precision = 100 * total_overlaps / pred_lens_sum
-    recall = 100 * total_overlaps / gold_lens_sum
+    precision = 100 * total_overlaps / (pred_lens_sum + total_overlaps)
+    recall = 100 * total_overlaps / (gold_lens_sum + total_overlaps)
     if precision+recall == 0:
         f_measure = .0
     else:
@@ -250,6 +254,21 @@ def main(args):
     guess_data = read_tsv(args.guess, False)  # only second column is needed
     assert len(gold_data["segments"]) == len(guess_data["segments"]), \
         "gold and guess tsvs do not have the same number of entries"
+
+    # the values needed for P/R can also be broken down per-example
+    #f1_ver1 -> original from sigmorphon
+    f1v1_tp = [n_correct(gold, guess)[0]
+                  for gold, guess
+                  in zip(gold_data["segments"], guess_data["segments"])]
+
+    f1v1_fp = [n_correct(gold, guess)[1]
+                  for gold, guess
+                  in zip(gold_data["segments"], guess_data["segments"])]
+
+    f1v1_fn = [n_correct(gold, guess)[2]
+                  for gold, guess
+                  in zip(gold_data["segments"], guess_data["segments"])]
+
     # f1_version2
     f1v2_tp = [f1_ver2(gold, guess)[0]
                        for gold, guess
@@ -294,24 +313,17 @@ def main(args):
              for gold, guess
              in zip(gold_data["segments"], guess_data["segments"])]
 
-    # the values needed for P/R can also be broken down per-example
-    n_overlaps = [n_correct(gold, guess)
-                  for gold, guess
-                  in zip(gold_data["segments"], guess_data["segments"])]
-    gold_lens = [len(gold.split("|")) for gold in gold_data["segments"]]
-    pred_lens = [len(guess.split("|")) for guess in guess_data["segments"]]
-
     if args.category:
         categories = gold_data["category"]
         # stratify by category
         dists_by_cat = stratify(dists, categories)
-        overlaps_by_cat = stratify(n_overlaps, categories)
-        gold_lens_by_cat = stratify(gold_lens, categories)
-        pred_lens_by_cat = stratify(pred_lens, categories)
+        overlaps_by_cat = stratify(f1v1_tp, categories)
+        f1v1_fp_by_cat = stratify(f1v1_fp, categories)
+        f1v1_fn_by_cat = stratify(f1v1_fn, categories)
 
-        f1v2_overlaps_by_cat = stratify(f1v2_tp, categories)
-        f1v2_gold_ovelaps_by_cat = stratify(f1v2_fp, categories)
-        f1v2_pred_overlaps_by_cat = stratify(f1v2_fn, categories)
+        f1v2_tp_by_cat = stratify(f1v2_tp, categories)
+        f1v2_fp_by_cat = stratify(f1v2_fp, categories)
+        f1v2_fn_by_cat = stratify(f1v2_fn, categories)
 
         f1v3_tp_by_cat = stratify(f1v3_tp, categories)
         f1v3_fp_by_cat = stratify(f1v3_fp, categories)
@@ -324,13 +336,13 @@ def main(args):
         for cat in sorted(dists_by_cat):
             cat_stats = compute_stats(
                 dists_by_cat[cat],
-                overlaps_by_cat[cat],
-                gold_lens_by_cat[cat],
-                pred_lens_by_cat[cat],
+                f1v1_tp_by_cat[cat],
+                f1v1_fp_by_cat[cat],
+                f1v1_fn_by_cat[cat],
 
-                f1v2_overlaps_by_cat[cat],
-                f1v2_gold_ovelaps_by_cat[cat],
-                f1v2_pred_overlaps_by_cat[cat],
+                f1v2_tp_by_cat[cat],
+                f1v2_fp_by_cat[cat],
+                f1v2_fn_by_cat[cat],
 
                 f1v3_tp_by_cat[cat],
                 f1v3_fp_by_cat[cat],
@@ -344,7 +356,7 @@ def main(args):
             )
             print_numbers(cat_stats, cat=cat)
 
-    overall_stats = compute_stats(dists, n_overlaps, gold_lens, pred_lens, f1v2_tp, f1v2_fp, f1v2_fn,
+    overall_stats = compute_stats(dists, f1v1_tp, f1v1_fp, f1v1_fn, f1v2_tp, f1v2_fp, f1v2_fn,
                                                 f1v3_tp, f1v3_fp, f1v3_fn, f1v4_tp, f1v4_fp, f1v4_fn)
     print_numbers(overall_stats)
 
