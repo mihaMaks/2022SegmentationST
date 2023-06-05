@@ -5,7 +5,7 @@ import pandas as pd
 from unidecode import unidecode
 
 # write a .csv file :
-# command: python3 word_by_word_eval.py --guess ../baseline/eng.word.dev.bert.tsv --gold ../data/eng.word.dev.tsv --out word_by_word_metrics.csv
+# command: python3 word_by_word_eval.py --guess ../baseline/eng.word.dev.bert.tsv --gold ../data/eng.word.dev.tsv --out word_by_word_metrics_ver2_ver3.csv
 """
 columns:        index|word|segmentation|prediction|distance|n_correct|f1_segmentation
 
@@ -16,19 +16,23 @@ run metrics for every word and write them in a .csv
 def compare_len(real_segm, pred_segm):
     real = set()
     pred = set()
+    real_str = ""
+    pred_str = ""
     c = 0
     for s in real_segm.split('|'):
         real.add((c, s))
+        real_str += s
         c += len(s)
     r_len = c
 
     c = 0
     for s in pred_segm.split('|'):
         pred.add((c, s))
+        pred_str += s
         c += len(s)
     p_len = c
 
-    if r_len != p_len:
+    if r_len != p_len or real_str != pred_str:
         return False
     return True
 
@@ -54,7 +58,7 @@ def distance(str1, str2):
 
 def n_correct(gold_segments, guess_segments):
     if not compare_len(gold_segments, guess_segments):
-        return -1
+        return 0, 0, 0
 
     a = gold_segments.split("|")
     b = guess_segments.split("|")
@@ -64,12 +68,12 @@ def n_correct(gold_segments, guess_segments):
             table[i][j] = (
                 table[i - 1][j - 1] + 1 if ca == cb else
                 max(table[i][j - 1], table[i - 1][j]))
-    return table[-1][-1]
+    return table[-1][-1], (len(guess_segments.split('|')) - table[-1][-1]), (len(gold_segments.split('|')) - table[-1][-1])
 
 
 def f1_ver2(real_segm, pred_segm):
     if not compare_len(real_segm, pred_segm):
-        return 0, 0, 0
+        return -1, 0, 0
 
     real_segm = real_segm.lower()
     real = set()
@@ -160,7 +164,6 @@ def appendMetrics(ground, pred_seg):
     gold_segments = gold_segments.lower()
     row_met.append(distance(gold_segments, guess_segments))
 
-    row_met.append(n_correct(gold_segments, guess_segments))
 
     # callculate instance-f1-score
     tp_fp_fn_v2 = f1_ver2(gold_segments, guess_segments)
@@ -179,24 +182,24 @@ def appendMetrics(ground, pred_seg):
     row_met.append(tp_fp_fn_v2[2])
 
     # callculate instance-f1-score
-    tp_fp_fn_v3 = f1_ver3(gold_segments, guess_segments)
+    tp_fp_fn_v1 = f1_ver3(gold_segments, guess_segments)
     precision = 0
-    if tp_fp_fn_v3[1] + tp_fp_fn_v3[0] != 0:
-        precision = tp_fp_fn_v3[0] / (tp_fp_fn_v3[0] + tp_fp_fn_v3[1])
+    if tp_fp_fn_v1[1] + tp_fp_fn_v1[0] != 0:
+        precision = tp_fp_fn_v1[0] / (tp_fp_fn_v1[0] + tp_fp_fn_v1[1])
     recall = 0
-    if tp_fp_fn_v3[2] + tp_fp_fn_v3[0] != 0:
-        recall = tp_fp_fn_v3[0] / (tp_fp_fn_v3[0] + tp_fp_fn_v3[2])
+    if tp_fp_fn_v1[2] + tp_fp_fn_v1[0] != 0:
+        recall = tp_fp_fn_v1[0] / (tp_fp_fn_v1[0] + tp_fp_fn_v1[2])
     if precision + recall == 0:
-        f1_score_v3 = .0
+        f1_score_v1 = .0
     else:
-        f1_score_v3 = 2 * precision * recall / (precision + recall)
-    row_met.append(tp_fp_fn_v3[0])
-    row_met.append(tp_fp_fn_v3[1])
-    row_met.append(tp_fp_fn_v3[2])
+        f1_score_v1 = 2 * precision * recall / (precision + recall)
+    row_met.append(tp_fp_fn_v1[0])
+    row_met.append(tp_fp_fn_v1[1])
+    row_met.append(tp_fp_fn_v1[2])
 
     row_met.append(round(f1_score_v2, 3))
-    row_met.append(round(f1_score_v3, 3))
-    row_met.append(abs(round((f1_score_v3 - f1_score_v2), 3)))
+    row_met.append(round(f1_score_v1, 3))
+    row_met.append(round(f1_score_v1 - f1_score_v2, 3))
 
     return row_met
 
@@ -216,7 +219,7 @@ def main(args):
 
     word_by_word_table.sort()
     table_data_frame = pd.DataFrame(word_by_word_table, columns=['category', 'word', 'segmentation', 'prediction',
-                                                                 'distance', 'overlaps',
+                                                                 'distance', #'overlaps'
                                                                  'f1v2_tp', 'f1v2_fp', 'f1v2_fn',
                                                                  'f1v3_tp', 'f1v3_fp', 'f1v3_fn',
                                                                  'f1v2_score', 'f1v3_score', 'abs_diff'])
