@@ -1,4 +1,7 @@
 # WORD SEGMENTATION - metric comparison
+New comparison is needed when we filter the data again, this was done based on how many words are   
+surface-level segmented !!!
+
 
 This file is summary of comparison between 3 F1-score metrics that are scoring  
 how well pretrained BERT-tokenizer predicts segemetation of words.  
@@ -41,15 +44,15 @@ Table also shows how words are categorised.
 
 | category | inflection | derivation | compound | precision | recall | f_measure | f1_ver2 | f1_ver3 | distance |
 |:--------:|:----------:|:----------:|:--------:|:---------:|:------:|:---------:|:-------:|:-------:|:--------:|
-|    000   |     no     |     no     |    no    |   3.44    |  9.44  |   5.04    |  5.04   |  6.64   |   1.75   |
-|    001   |     no     |     no     |    yes   |   54.21   | 67.96  |   60.31   |  60.31  |  68.33  |   0.84   |
-|    010   |     no     |     yes    |    no    |   30.81   | 43.84  |   36.19   |  36.19  |  47.37  |   2.70   |
-|    011   |     no     |     yes    |    yes   |   51.20   | 47.73  |   49.40   |  49.40  |  66.63  |   2.19   |
-|    100   |     yes    |     no     |    no    |   13.73   | 21.83  |   16.86   |  16.80  |  22.55  |   2.62   |
-|    101   |     yes    |     no     |    yes   |   55.63   | 52.72  |   54.14   |  54.14  |  67.59  |   1.43   |
-|    110   |     yes    |     yes    |    no    |   31.17   | 33.89  |   32.48   |  33.42  |  48.40  |   3.27   |
-|    111   |     yes    |     yes    |    yes   |   42.56   | 34.50  |   38.11   |  38.11  |  58.18  |   3.12   |
-|    all   |      -     |      -     |     -    |   23.48   | 34.84  |   28.05   |  28.02  |  36.78  |   2.55   |
+|   000    |     no     |     no     |    no    |   3.44    |  9.44  |   5.04    |  5.04   |  6.64   |   1.75   |
+|   001    |     no     |     no     |    yes   |   54.21   | 67.96  |   60.31   |  60.31  |  68.33  |   0.84   |
+|   010    |     no     |     yes    |    no    |   30.81   | 43.84  |   36.19   |  36.19  |  47.37  |   2.70   |
+|   011    |     no     |     yes    |    yes   |   51.20   | 47.73  |   49.40   |  49.40  |  66.63  |   2.19   |
+|   100    |     yes    |     no     |    no    |   13.73   | 21.83  |   16.86   |  16.80  |  22.55  |   2.62   |
+|   101    |     yes    |     no     |    yes   |   55.63   | 52.72  |   54.14   |  54.14  |  67.59  |   1.43   |
+|   110    |     yes    |     yes    |    no    |   31.17   | 33.89  |   32.48   |  33.42  |  48.40  |   3.27   |
+|   111    |     yes    |     yes    |    yes   |   42.56   | 34.50  |   38.11   |  38.11  |  58.18  |   3.12   |
+|   all    |      -     |      -     |     -    |   23.48   | 34.84  |   28.05   |  28.02  |  36.78  |   2.55   |
 From: https://github.com/mihaMaks/2022SegmentationST/blob/main/evaluation/evaluation.txt
 
 
